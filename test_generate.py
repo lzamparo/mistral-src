@@ -1,3 +1,4 @@
+import os
 import torch
 from typing import List
 
@@ -31,27 +32,27 @@ class DebugTokenizer:
 
 def test_generation():
     torch.manual_seed(42)
-
+    temperature = 0.2
     sequences = ["1 2 3 4 5 6 7", "0 1 2", "12 13 14", "2 4 34"]
     args = ModelArgs(
-        dim=512,
+        dim=64,
         n_layers=1,
-        head_dim=128,
-        hidden_dim=2048,
-        n_heads=4,
+        head_dim=64,
+        hidden_dim=128,
+        n_heads=2,
         n_kv_heads=2,
         sliding_window=3,
         norm_eps=1e-5,
         vocab_size=32_000,
         max_batch_size=len(sequences),
     )
-    model = Transformer(args).to("cuda", dtype=torch.float32)
+    model = Transformer(args) #.to("cuda", dtype=torch.float32)
     tokenizer = DebugTokenizer()
 
     # for attempt in range(10):
-    toks, all_logprobs_old = generate(sequences, model, tokenizer, max_tokens=7)
+    toks, all_logprobs_old = generate(sequences, model, tokenizer, temperature=temperature, max_tokens=7)
     toks = [" ".join(r.split(" ")[1:]) for r in toks] # Remove BOS
-    generated, all_logprobs_new = generate(toks, model, tokenizer, max_tokens=0)
+    generated, all_logprobs_new = generate(toks, model, tokenizer, temperature=temperature, max_tokens=0)
     assert generated == []
     
     # Verify that logprobs are the same
@@ -60,6 +61,41 @@ def test_generation():
         assert all([abs(x - y) < 1e-5 for x, y in zip(lp_old, lp_new)]), f"\n{lp_old}\n{lp_new}"
 
     print("All tests passed.")
+
+
+def test_save_output_and_tensors(outdir: str):
+    torch.manual_seed(42)
+    temperature = 0.2
+    sequences = ["1 2 3 4 5 6 7", "0 1 2", "12 13 14", "2 4 34"]
+    args = ModelArgs(
+        dim=64,
+        n_layers=1,
+        head_dim=64,
+        hidden_dim=128,
+        n_heads=2,
+        n_kv_heads=2,
+        sliding_window=3,
+        norm_eps=1e-5,
+        vocab_size=32_000,
+        max_batch_size=len(sequences),
+    )
+    model = Transformer(args) #.to("cuda", dtype=torch.float32)
+    tokenizer = DebugTokenizer()
+
+    # for attempt in range(10):
+    toks, all_logprobs_old = generate(sequences, model, tokenizer, temperature=temperature, max_tokens=7)
+    toks = [" ".join(r.split(" ")[1:]) for r in toks] # Remove BOS
+    generated, all_logprobs_new = generate(toks, model, tokenizer, temperature=temperature, max_tokens=0)
+    assert generated == []
+    
+    # Verify that logprobs are the same
+    assert len(sequences) == len(all_logprobs_old) == len(all_logprobs_new)
+    for lp_old, lp_new in zip(all_logprobs_old, all_logprobs_new):
+        assert all([abs(x - y) < 1e-5 for x, y in zip(lp_old, lp_new)]), f"\n{lp_old}\n{lp_new}"
+
+    # save tensors
+        
+    # save model dict
 
 
 def test_chunks():
@@ -92,5 +128,7 @@ def test_chunks():
     
 
 if __name__ == "__main__":
+    outdir = os.path.expanduser("~/projects/mixtral_weights/small")
     test_generation()
-    test_chunks()
+    test_save_output_and_tensors(outdir)
+    # test_chunks()
